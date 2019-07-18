@@ -21,7 +21,7 @@ Go to [download link](https://www.ghostscript.com/download/gsdnld.html), select 
 
 ### Compile it from source
 
-Please refer to the offical [docuementation](https://www.ghostscript.com/documentation.html), select the version what you looking for and HOWTO compile `Ghostscript`.
+Please refer to the offical [documentation](https://www.ghostscript.com/documentation.html), select the version what you looking for and HOWTO compile `Ghostscript`.
 
 ## Installation
 ```
