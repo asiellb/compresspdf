@@ -1,0 +1,64 @@
+#! /bin/bash
+
+##### Functions
+usage() {
+    echo -e "\033[1mHelp\033[0m \n
+        compresspdf [-f [file] -s \033[1mscreen\033[0m|ebook|printer|prepress ] | -h ] \n
+    \033[1m**\033[0m Default conversion setting is screen.\n
+Then: \n
+- You get the output \033[1mfilename_small.pdf\033[0m \n"
+}
+
+compresspdf() {
+    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${3:-"$setting"}} -dCompatibilityLevel=1.4 -sOutputFile="$DST" "$SRC"
+}
+
+##### Main
+# Transform long options to short ones
+for arg in "$@"; do
+  shift
+  case "$arg" in
+    "--help")       set -- "$@" "-h" ;;
+    "--file")       set -- "$@" "-f" ;;
+    "--setting")    set -- "$@" "-s" ;;
+    "--?")    set -- "$@" "-s" ;;
+    *)              set -- "$@" "$arg"
+  esac
+done
+# Default behavior
+setting="screen"
+# Parse short options
+OPTIND=1
+while getopts ":h:f:s:?:" opt; do
+  case "$opt" in
+    "h")    usage
+            exit 0
+            ;;
+    "f")    SRC=$OPTARG
+            DST="${SRC%.*}"_small.pdf
+            ;;
+    "s")    setting=$OPTARG
+            ;;
+    "?")    usage
+            exit 1
+            ;;
+    *)      usage
+            exit 1
+  esac
+done
+shift $(expr $OPTIND - 1) # remove options from positional parameters
+
+if [[ ! $SRC ]]; then
+    echo -e "\033[1mWarning\033[0m \n
+    At least an input file is required to convert! \n
+        Use \033[1mcompresspdf -h\033[0m for help. \n"
+    exit
+else
+    if [[ -f $SRC ]]; then
+        compresspdf
+        echo "The output file was saved to $DST"
+    else
+        echo -e "\033[1mError\033[0m \n
+    File \033[1m$SRC\033[0m to convert not found! \n"
+    fi
+fi
