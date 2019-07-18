@@ -1,5 +1,5 @@
 #! /bin/bash
-
+# Shell script to compress pdf using ghostscript lib.
 ##### Functions
 usage() {
     echo -e "\033[1mHelp\033[0m \n
