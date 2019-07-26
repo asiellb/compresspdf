@@ -33,10 +33,10 @@ sudo wget https://raw.githubusercontent.com/asiellb/compresspdf/master/compressp
 compresspdf [ [ -f [file] -s [escreen|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | -h ]
 ```
 
-Settings options:
+#### Settings options:
 
-- /screen selects low-resolution (72 dpi images) output similar to the Acrobat Distiller "Screen Optimized" setting.
-- /ebook selects medium-resolution (150 dpi images) output similar to the Acrobat Distiller "eBook" setting.
-- /printer selects output (300 dpi images) similar to the Acrobat Distiller "Print Optimized" setting.
-- /prepress selects output (300 dpi images, color preserving) similar to Acrobat Distiller "Prepress Optimized" setting.
-- /default selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file.
+- **screen** selects low-resolution (72 dpi images) output similar to the Acrobat Distiller "Screen Optimized" setting.
+- **ebook** selects medium-resolution (150 dpi images) output similar to the Acrobat Distiller "eBook" setting.
+- **printer** selects output (300 dpi images) similar to the Acrobat Distiller "Print Optimized" setting.
+- **prepress** selects output (300 dpi images, color preserving) similar to Acrobat Distiller "Prepress Optimized" setting.
+- **default** selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file.
