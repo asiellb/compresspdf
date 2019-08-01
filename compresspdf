@@ -9,7 +9,7 @@ Then: \n
 - You get the output \033[1mfilename_small.pdf\033[0m \n"
 }
 compresspdf() {
-    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"screen"} -dCompatibilityLevel=1.4 ${additionals:-} -sOutputFile="$DST" "$SRC"
+    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"screen"} -dCompatibilityLevel=1.4 ${additionals:-} -sOutputFile="$DST" "$SRC" 2>&1 > /dev/null
 }
 ##### Main
 for arg in "$@"; do
@@ -80,7 +80,7 @@ else
                 additionals=$additionals$grayopt
             fi
         fi
-        compresspdf
+        compresspdf > /dev/null
         if [ $? -eq 0 ]; then
             echo -e "\033[1mInfo\033[0m \n
         The output file was saved to $DST \n"

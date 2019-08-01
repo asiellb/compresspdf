@@ -23,9 +23,9 @@ Go to [download link](https://www.ghostscript.com/download/gsdnld.html), select 
 
 Please refer to the offical [documentation](https://www.ghostscript.com/documentation.html), select the version what you looking for and HOWTO compile `Ghostscript`.
 
-## Installation
-```
-sudo wget https://raw.githubusercontent.com/asiellb/compresspdf/master/compresspdf -O /usr/local/bin/compresspdf && sudo chmod +x /usr/local/bin/compresspdf
+# Installation
+```console
+curl -L https://git.io/fj98I | bash
 ```
 ## Usage
 
