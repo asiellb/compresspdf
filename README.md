@@ -24,14 +24,14 @@ Go to [download link](https://www.ghostscript.com/download/gsdnld.html), select 
 
 Please refer to the offical [documentation](https://www.ghostscript.com/documentation.html), select the version what you looking for and HOWTO compile `Ghostscript`.
 
-# Installation
+# Installation and update
 ```console
 curl -L https://git.io/fj98I | bash
 ```
 ## Usage
 
 ```
-compresspdf [ [ -f [file] -s [escreen|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | -h ]
+compresspdf [ -f [file] -s [screen|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | [ -h ] | [ -u ]
 ```
 
 ### Options
@@ -50,3 +50,6 @@ Grayscale **-g** option make grayscale document.
 
 ##### Split options
 Split options **-i** and **-e** select split page range to output document.
+
+##### Update
+Use **-u** to update ```compresspdf`` script.

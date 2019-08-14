@@ -3,13 +3,21 @@
 ##### Functions
 usage() {
     echo -e "\033[1mHelp\033[0m \n
-        compresspdf [-f [file] -s [\033[1mscreen\033[0m|ebook|printer|prepress|default] -i [initial page] -e [end page] -g | -h ] \n
+        compresspdf [ -f [file] -s [\033[1mscreen\033[0m|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | [ -h ] | [ -u ] \n
     \033[1m**\033[0m Default conversion setting is screen. Use initial and end numbers for splitting pages. \n
 Then: \n
 - You get the output \033[1mfilename_small.pdf\033[0m \n"
 }
-compresspdf() {
+compresspdf () {
     gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"screen"} -dCompatibilityLevel=1.4 ${additionals:-} -sOutputFile="$DST" "$SRC" 2>&1 > /dev/null
+}
+update () {
+    curl -Ls https://git.io/fj98I | bash
+    if [[ $? -eq 0 ]]; then
+        exit 0
+    else
+        exit 1
+    fi
 }
 ##### Main
 for arg in "$@"; do
@@ -21,12 +29,13 @@ for arg in "$@"; do
     "--initial")    set -- "$@" "-i" ;;
     "--end")        set -- "$@" "-e" ;;
     "--gray")       set -- "$@" "-g" ;;
+    "--update")     set -- "$@" "-u" ;;
     "--?")          set -- "$@" "-?" ;;
     *)              set -- "$@" "$arg"
   esac
 done
 OPTIND=1
-while getopts ":h:f:s:i:e:g?" opt; do
+while getopts ":h:f:s:i:e:gu?" opt; do
   case "$opt" in
     "h")    usage
             exit 0
@@ -41,6 +50,8 @@ while getopts ":h:f:s:i:e:g?" opt; do
     "e")    end=$OPTARG
             ;;
     "g")    gray=true
+            ;;
+    "u")    update
             ;;
     "?")    usage
             exit 1
