@@ -3,7 +3,7 @@
 ##### Functions
 usage() {
     echo -e "\033[1mHelp\033[0m \n
-        compresspdf [-f [file] -s [\033[1mscreen\033[0m|ebook|printer|prepress] -i [initial page] -e [end page] -g | -h ] \n
+        compresspdf [-f [file] -s [\033[1mscreen\033[0m|ebook|printer|prepress|default] -i [initial page] -e [end page] -g | -h ] \n
     \033[1m**\033[0m Default conversion setting is screen. Use initial and end numbers for splitting pages. \n
 Then: \n
 - You get the output \033[1mfilename_small.pdf\033[0m \n"

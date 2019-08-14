@@ -3,8 +3,9 @@ Shell script to compress pdf using `Ghostscript` lib.
 
 ## Description
 Shell script to compress pdf using `Ghostscript`:
- - Reduce BigPDF Files
+ - Reduce BigPDF files
  - Optimize the PDF size
+ - Split PDF files
 
 ## Requierement
 
@@ -33,10 +34,19 @@ curl -L https://git.io/fj98I | bash
 compresspdf [ [ -f [file] -s [escreen|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | -h ]
 ```
 
-#### Settings options:
+### Options
 
-- **screen** selects low-resolution (72 dpi images) output similar to the Acrobat Distiller "Screen Optimized" setting.
-- **ebook** selects medium-resolution (150 dpi images) output similar to the Acrobat Distiller "eBook" setting.
-- **printer** selects output (300 dpi images) similar to the Acrobat Distiller "Print Optimized" setting.
-- **prepress** selects output (300 dpi images, color preserving) similar to Acrobat Distiller "Prepress Optimized" setting.
-- **default** selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file.
+##### Settings
+Use **-s** option to select output document resolution, default conversion setting its **screen**.
+
+- **screen:** selects low-resolution (72 dpi images) output similar to the Acrobat Distiller "Screen Optimized" setting.
+- **ebook:** selects medium-resolution (150 dpi images) output similar to the Acrobat Distiller "eBook" setting.
+- **printer:** selects output (300 dpi images) similar to the Acrobat Distiller "Print Optimized" setting.
+- **prepress:** selects output (300 dpi images, color preserving) similar to Acrobat Distiller "Prepress Optimized" setting.
+- **default:** selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file.
+
+##### Grayscale
+Grayscale **-g** option make grayscale document.
+
+##### Split options
+Split options **-i** and **-e** select split page range to output document.
