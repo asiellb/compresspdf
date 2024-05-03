@@ -3,15 +3,15 @@
 ##### Functions
 usage() {
     echo -e "\033[1mHelp\033[0m \n
-        compresspdf [ -f [file] -s [\033[1mscreen\033[0m|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | [ -h ] | [ -u ] \n
+        compresspdf [ -s(--setting) [\033[1mscreen\033[0m|ebook|printer|prepress] -l(--layout) [\033[1mletter\033[0m|a4|legal|prepress] -i(--initial) [initial page] -e(--end) [end page] -g(--gray) -c(--clean)  -f(--file) [file] ] | [ -h [help] ] | [ -u [update] ] \n
     \033[1m**\033[0m Default conversion setting is screen. Use initial and end numbers for splitting pages. \n
 Then: \n
 - You get the output \033[1mfilename_small.pdf\033[0m \n"
 }
-compresspdf () {
-    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"screen"} -dCompatibilityLevel=1.4 ${additionals:-} -sOutputFile="$DST" "$SRC" 2>&1 > /dev/null
+compress() {
+    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"screen"} -dFitPage -sPAPERSIZE=${layout:-"letter"} -dCompatibilityLevel=1.5 -dSubsetFonts=true -dCompressFonts=true -dEmbedAllFonts=true -dDetectDuplicateImages=true -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -dMonoImageDownsampleType=/Bicubic -dMonoImageResolution=300 -dDownsampleColorImages=true -dDoThumbnails=false -dCreateJobTicket=false -dPreserveEPSInfo=false -dPreserveOPIComments=false -dPreserveOverprintSettings=false -dUCRandBGInfo=/Remove ${additionals:-} -sOutputFile="$DST" "$SRC" 2>&1 >/dev/null
 }
-update () {
+update() {
     curl -Ls https://git.io/fj98I | bash
     if [[ $? -eq 0 ]]; then
         exit 0
@@ -21,44 +21,62 @@ update () {
 }
 ##### Main
 for arg in "$@"; do
-  shift
-  case "$arg" in
-    "--help")       set -- "$@" "-h" ;;
-    "--file")       set -- "$@" "-f" ;;
-    "--setting")    set -- "$@" "-s" ;;
-    "--initial")    set -- "$@" "-i" ;;
-    "--end")        set -- "$@" "-e" ;;
-    "--gray")       set -- "$@" "-g" ;;
-    "--update")     set -- "$@" "-u" ;;
-    "--?")          set -- "$@" "-?" ;;
-    *)              set -- "$@" "$arg"
-  esac
+    shift
+    case "$arg" in
+    "--help") set -- "$@" "-h" ;;
+    "--clean") set -- "$@" "-c" ;;
+    "--layout") set -- "$@" "-l" ;;
+    "--file") set -- "$@" "-f" ;;
+    "--setting") set -- "$@" "-s" ;;
+    "--initial") set -- "$@" "-i" ;;
+    "--end") set -- "$@" "-e" ;;
+    "--gray") set -- "$@" "-g" ;;
+    "--update") set -- "$@" "-u" ;;
+    "--?") set -- "$@" "-?" ;;
+    *) set -- "$@" "$arg" ;;
+    esac
 done
 OPTIND=1
-while getopts ":h:f:s:i:e:gu?" opt; do
-  case "$opt" in
-    "h")    usage
-            exit 0
-            ;;
-    "f")    SRC=$OPTARG
-            DST="${SRC%.*}"_small.pdf
-            ;;
-    "s")    setting=$OPTARG
-            ;;
-    "i")    initial=$OPTARG
-            ;;
-    "e")    end=$OPTARG
-            ;;
-    "g")    gray=true
-            ;;
-    "u")    update
-            ;;
-    "?")    usage
-            exit 1
-            ;;
-    *)      usage
-            exit 1
-  esac
+while getopts ":h:l:f:s:i:e:gu?c" opt; do
+    case "$opt" in
+    "h")
+        usage
+        exit 0
+        ;;
+    "c")
+        clean=true
+        ;;
+    "l")
+        layout=$OPTARG
+        ;;
+    "f")
+        SRC=$OPTARG
+        DST="${SRC%.*}"_small.pdf
+        ;;
+    "s")
+        setting=$OPTARG
+        ;;
+    "i")
+        initial=$OPTARG
+        ;;
+    "e")
+        end=$OPTARG
+        ;;
+    "g")
+        gray=true
+        ;;
+    "u")
+        update
+        ;;
+    "?")
+        usage
+        exit 1
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+    esac
 done
 shift $(expr $OPTIND - 1)
 if [[ ! $SRC ]]; then
@@ -71,11 +89,6 @@ else
         if [[ $initial || $end ]]; then
             if [[ $initial && $end ]]; then
                 splitopt=" -dFirstPage=$initial -dLastPage=$end"
-                if [[ ! $additionals ]]; then
-                    additionals=$splitopt
-                else
-                    additionals=$additionals$splitopt
-                fi
             else
                 echo -e "\033[1mWarning\033[0m \n
                 For split options it´s neccesary both, the [-i (--initial)] and [-e (--end)] pages  to continue! \n
@@ -84,14 +97,19 @@ else
             fi
         fi
         if [[ $gray ]]; then
-            grayopt=" -sProcessColorModel=DeviceGray -sColorConversionStrategy=Gray -dOverrideICC"
-            if [[ ! $additionals ]]; then
-                additionals=$grayopt
-            else
-                additionals=$additionals$grayopt
-            fi
+            coloropt=" -sProcessColorModel=DeviceGray -sColorConversionStrategy=Gray -dOverrideICC"
+        else
+            coloropt=" -sProcessColorModel=DeviceRGB -sColorConversionStrategy=RGB -sColorConversionStrategyForImages=RGB -dConvertCMYKImagesToRGB=true"
         fi
-        compresspdf > /dev/null
+        if [[ $clean ]]; then
+            cleanopt=" -dNO_PDFMARK_OUTLINES"
+        fi
+        if [[ ! $additionals ]]; then
+            additionals=$splitopt$coloropt$cleanopt
+        else
+            additionals=$additionals$splitopt$coloropt$cleanopt
+        fi
+        compress >/dev/null
         if [ $? -eq 0 ]; then
             echo -e "\033[1mInfo\033[0m \n
         The output file was saved to $DST \n"
