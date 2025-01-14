@@ -3,13 +3,13 @@
 ##### Functions
 usage() {
     echo -e "\033[1mHelp\033[0m \n
-        compresspdf [ -s(--setting) [\033[1mscreen\033[0m|ebook|printer|prepress] -l(--layout) [\033[1mletter\033[0m|a4|legal|prepress] -i(--initial) [initial page] -e(--end) [end page] -g(--gray) -c(--clean)  -f(--file) [file] ] | [ -h [help] ] | [ -u [update] ] \n
+        compresspdf [ -s(--setting) [\033[1mdefault\033[0m|screen|ebook|printer|prepress] -l(--layout) [\033[1mletter\033[0m|a4|legal|prepress] -i(--initial) [initial page] -e(--end) [end page] -g(--gray) -c(--clean)  -f(--file) [file] ] | [ -h [help] ] | [ -u [update] ] \n
     \033[1m**\033[0m Default conversion setting is screen. Use initial and end numbers for splitting pages. \n
 Then: \n
 - You get the output \033[1mfilename_small.pdf\033[0m \n"
 }
 compress() {
-    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"screen"} -dFitPage -sPAPERSIZE=${layout:-"letter"} -dCompatibilityLevel=1.5 -dSubsetFonts=true -dCompressFonts=true -dEmbedAllFonts=true -dDetectDuplicateImages=true -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -dMonoImageDownsampleType=/Bicubic -dMonoImageResolution=300 -dDownsampleColorImages=true -dDoThumbnails=false -dCreateJobTicket=false -dPreserveEPSInfo=false -dPreserveOPIComments=false -dPreserveOverprintSettings=false -dUCRandBGInfo=/Remove ${additionals:-} -sOutputFile="$DST" "$SRC" 2>&1 >/dev/null
+    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${setting:-"default"} -dFitPage -sPAPERSIZE=${layout:-"letter"} -dCompatibilityLevel=1.5 -dSubsetFonts=true -dCompressFonts=true -dEmbedAllFonts=true -dDetectDuplicateImages=true -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -dMonoImageDownsampleType=/Bicubic -dMonoImageResolution=300 -dDownsampleColorImages=true -dDoThumbnails=false -dCreateJobTicket=false -dPreserveEPSInfo=false -dPreserveOPIComments=false -dPreserveOverprintSettings=false -dUCRandBGInfo=/Remove ${additionals:-} -sOutputFile="$DST" "$SRC" 2>&1 >/dev/null
 }
 update() {
     curl -Ls https://git.io/fj98I | bash
