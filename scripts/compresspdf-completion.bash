@@ -231,7 +231,7 @@ install_completion() {
             fi
             
             if [[ -d "${completion_dir}" ]]; then
-                cp "${BASH_SOURCE[0]}" "${completion_dir}/compresspdf"
+                cp "${BASH_SOURCE[0]:-$0}" "${completion_dir}/compresspdf"
                 echo "Bash completion installed to: ${completion_dir}/compresspdf"
                 echo "Restart your shell or run: source ${completion_dir}/compresspdf"
             else
@@ -253,7 +253,7 @@ install_completion() {
             fi
             
             if [[ -d "${completion_dir}" ]]; then
-                cp "${BASH_SOURCE[0]}" "${completion_dir}/_compresspdf"
+                cp "${BASH_SOURCE[0]:-$0}" "${completion_dir}/_compresspdf"
                 echo "Zsh completion installed to: ${completion_dir}/_compresspdf"
                 echo "Restart your shell or run: autoload -Uz compinit && compinit"
             else
@@ -320,7 +320,7 @@ EOF
 # =============================================================================
 
 # If script is run directly (not sourced), show help or run install function
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-$0}" == "${0}" ]]; then
     case "${1:-}" in
         install_completion)
             install_completion "${2:-}" "${3:-}"

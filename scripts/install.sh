@@ -998,6 +998,7 @@ main() {
 # =============================================================================
 
 # Only run main function if script is executed directly (not sourced)
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Handle cases where BASH_SOURCE is not available (e.g., when piped from curl)
+if [[ "${BASH_SOURCE[0]:-$0}" == "${0}" ]]; then
     main "$@"
 fi
