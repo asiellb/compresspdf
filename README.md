@@ -1,55 +1,65 @@
-# CompressPDF
-Shell script to compress pdf using `Ghostscript` lib.
+# compresspdf
 
-## Description
-Shell script to compress pdf using `Ghostscript`:
- - Reduce BigPDF files
- - Optimize the PDF size
- - Split PDF files
+Professional PDF compression tool using Ghostscript
 
-## Requierement
+## Quick Start
 
-### MacOS
-```
-brew install ghostscript
-```
-### Linux
-```
-yum install ghostscript
-```
-### Windows
-Go to [download link](https://www.ghostscript.com/download/gsdnld.html), select your platform and install it!.
+```bash
+# Install
+make install
 
-### Compile it from source
+# Basic usage
+compresspdf document.pdf
 
-Please refer to the offical [documentation](https://www.ghostscript.com/documentation.html), select the version what you looking for and HOWTO compile `Ghostscript`.
-
-# Installation and update
-```console
-curl -L https://git.io/fj98I | bash
-```
-## Usage
-
-```
-compresspdf [ -f [file] -s [screen|ebook|printer|prepress] -i [initial page] -e [end page] -g ] | [ -h ] | [ -u ]
+# Advanced usage
+compresspdf -s printer -l a4 -g document.pdf
 ```
 
-### Options
+## Project Structure
 
-##### Settings
-Use **-s** option to select output document resolution, default conversion setting its **screen**.
+```
+compresspdf/
+├── src/                    # Source code
+│   └── compresspdf         # Main executable script
+├── scripts/                # Installation and utility scripts
+│   ├── install.sh          # Installation script
+│   └── compresspdf-completion.bash  # Shell completion
+├── docs/                   # Documentation
+│   ├── README.md           # Detailed documentation
+│   └── compresspdf.1       # Man page
+├── tests/                  # Test files (future)
+├── examples/               # Example files and test data
+├── Makefile               # Build and installation tasks
+└── LICENSE                # License file
+```
 
-- **screen:** selects low-resolution (72 dpi images) output similar to the Acrobat Distiller "Screen Optimized" setting.
-- **ebook:** selects medium-resolution (150 dpi images) output similar to the Acrobat Distiller "eBook" setting.
-- **printer:** selects output (300 dpi images) similar to the Acrobat Distiller "Print Optimized" setting.
-- **prepress:** selects output (300 dpi images, color preserving) similar to Acrobat Distiller "Prepress Optimized" setting.
-- **default:** selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file.
+## Installation
 
-##### Grayscale
-Grayscale **-g** option make grayscale document.
+```bash
+# System-wide installation (requires sudo)
+make install
 
-##### Split options
-Split options **-i** and **-e** select split page range to output document.
+# User installation
+make install-user
 
-##### Update
-Use **-u** to update ```compresspdf`` script.
+# With completion support
+make install-completion
+```
+
+## Documentation
+
+See [docs/README.md](docs/README.md) for complete documentation.
+
+## Features
+
+- **Professional compression** with 5 quality levels
+- **Multiple page formats** (Letter, A4, Legal)
+- **Advanced options** (grayscale, metadata cleaning, page ranges)
+- **Intelligent autocompletion** for all supported shells
+- **Robust error handling** and logging
+- **Cross-platform compatibility** (macOS, Linux, Unix)
+- **Configurable defaults** via config file
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.

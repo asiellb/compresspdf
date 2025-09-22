@@ -1,0 +1,963 @@
+#!/bin/bash
+
+# compresspdf - Professional PDF compression tool using Ghostscript
+# Version: 2.0.0
+# Author: Professional Enhancement
+# License: See LICENSE file
+
+set -euo pipefail  # Strict mode: exit on error, undefined vars, pipe failures
+IFS=$'\n\t'        # Secure internal field separator
+
+# =============================================================================
+# CONSTANTS AND DEFAULTS
+# =============================================================================
+
+readonly SCRIPT_NAME="compresspdf"
+readonly SCRIPT_VERSION="2.0.0"
+readonly SCRIPT_DESCRIPTION="Professional PDF compression tool using Ghostscript"
+
+# Default values
+readonly DEFAULT_SETTING="screen"
+readonly DEFAULT_LAYOUT="letter"
+readonly DEFAULT_CONFIG_DIR="${HOME}/.config/compresspdf"
+readonly DEFAULT_CONFIG_FILE="${DEFAULT_CONFIG_DIR}/config"
+readonly DEFAULT_LOG_DIR="${HOME}/.local/share/compresspdf/logs"
+readonly DEFAULT_LOG_FILE="${DEFAULT_LOG_DIR}/compresspdf.log"
+
+# Valid options arrays
+readonly -a VALID_SETTINGS=("default" "screen" "ebook" "printer" "prepress")
+readonly -a VALID_LAYOUTS=("letter" "a4" "legal" "prepress")
+
+# Color codes (will be set based on terminal capabilities)
+COLOR_RED=""
+COLOR_GREEN=""
+COLOR_YELLOW=""
+COLOR_BLUE=""
+COLOR_MAGENTA=""
+COLOR_CYAN=""
+COLOR_WHITE=""
+COLOR_BOLD=""
+COLOR_RESET=""
+
+# Global variables
+input_file=""
+output_file=""
+setting="${DEFAULT_SETTING}"
+layout="${DEFAULT_LAYOUT}"
+initial_page=""
+end_page=""
+grayscale=false
+clean_metadata=false
+verbose=false
+quiet=false
+force_overwrite=false
+config_file="${DEFAULT_CONFIG_FILE}"
+log_file="${DEFAULT_LOG_FILE}"
+dry_run=false
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+# Initialize colors based on terminal capabilities
+init_colors() {
+    if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+        local colors
+        colors=$(tput colors 2>/dev/null || echo "0")
+        if [[ ${colors} -ge 8 ]]; then
+            COLOR_RED=$(tput setaf 1)
+            COLOR_GREEN=$(tput setaf 2)
+            COLOR_YELLOW=$(tput setaf 3)
+            COLOR_BLUE=$(tput setaf 4)
+            COLOR_MAGENTA=$(tput setaf 5)
+            COLOR_CYAN=$(tput setaf 6)
+            COLOR_WHITE=$(tput setaf 7)
+            COLOR_BOLD=$(tput bold)
+            COLOR_RESET=$(tput sgr0)
+        fi
+    fi
+}
+
+# Logging functions
+log_debug() {
+    [[ ${verbose} == true ]] && echo "${COLOR_CYAN}[DEBUG]${COLOR_RESET} $*" >&2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DEBUG] $*" >> "${log_file}" 2>/dev/null || true
+}
+
+log_info() {
+    [[ ${quiet} == false ]] && echo "${COLOR_GREEN}[INFO]${COLOR_RESET} $*" >&2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $*" >> "${log_file}" 2>/dev/null || true
+}
+
+log_warning() {
+    echo "${COLOR_YELLOW}[WARNING]${COLOR_RESET} $*" >&2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $*" >> "${log_file}" 2>/dev/null || true
+}
+
+log_error() {
+    echo "${COLOR_RED}[ERROR]${COLOR_RESET} $*" >&2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $*" >> "${log_file}" 2>/dev/null || true
+}
+
+log_fatal() {
+    echo "${COLOR_RED}${COLOR_BOLD}[FATAL]${COLOR_RESET} $*" >&2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [FATAL] $*" >> "${log_file}" 2>/dev/null || true
+    exit 1
+}
+
+# Create directory if it doesn't exist
+ensure_directory() {
+    local dir="$1"
+    if [[ ! -d "${dir}" ]]; then
+        if ! mkdir -p "${dir}" 2>/dev/null; then
+            log_warning "Failed to create directory: ${dir}"
+            # Try alternative directory
+            if [[ "${dir}" == "${DEFAULT_LOG_DIR}" ]]; then
+                # Fallback to /tmp for logs if home directory is not writable
+                log_file="/tmp/compresspdf.log"
+                log_warning "Using fallback log file: ${log_file}"
+            fi
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# Check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Validate if file is a PDF
+is_pdf_file() {
+    local file="$1"
+    if [[ ! -f "${file}" ]]; then
+        return 1
+    fi
+    
+    # Try different approaches to detect PDF files
+    # Method 1: Use file command with MIME type (most reliable)
+    if command_exists file; then
+        if file -b --mime-type "${file}" 2>/dev/null | grep -q "application/pdf"; then
+            return 0
+        fi
+        
+        # Method 2: Use file command without MIME type (fallback)
+        if file -b "${file}" 2>/dev/null | grep -i "pdf" >/dev/null; then
+            return 0
+        fi
+    fi
+    
+    # Method 3: Check file extension and magic bytes (last resort)
+    if [[ "${file}" =~ \.pdf$ ]]; then
+        # Check for PDF magic bytes (%PDF-)
+        if head -c 5 "${file}" 2>/dev/null | grep -q "%PDF-"; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# Get file size in human readable format
+get_file_size() {
+    local file="$1"
+    if [[ -f "${file}" ]]; then
+        # Try different approaches for cross-platform compatibility
+        if command_exists du; then
+            # GNU du and BSD du both support -h
+            du -h "${file}" 2>/dev/null | cut -f1
+        elif command_exists ls; then
+            # Fallback to ls -lh
+            ls -lh "${file}" 2>/dev/null | awk '{print $5}'
+        else
+            echo "Unknown"
+        fi
+    else
+        echo "0B"
+    fi
+}
+
+# Calculate compression ratio
+calculate_compression_ratio() {
+    local original_file="$1"
+    local compressed_file="$2"
+    
+    if [[ -f "${original_file}" && -f "${compressed_file}" ]]; then
+        local original_size compressed_size ratio
+        
+        # Cross-platform stat command handling
+        # macOS uses -f%z, Linux uses -c%s
+        if stat -f%z "${original_file}" >/dev/null 2>&1; then
+            # BSD stat (macOS)
+            original_size=$(stat -f%z "${original_file}" 2>/dev/null || echo "0")
+            compressed_size=$(stat -f%z "${compressed_file}" 2>/dev/null || echo "0")
+        elif stat -c%s "${original_file}" >/dev/null 2>&1; then
+            # GNU stat (Linux)
+            original_size=$(stat -c%s "${original_file}" 2>/dev/null || echo "0")
+            compressed_size=$(stat -c%s "${compressed_file}" 2>/dev/null || echo "0")
+        else
+            # Fallback to using du or ls
+            original_size=$(get_raw_file_size "${original_file}")
+            compressed_size=$(get_raw_file_size "${compressed_file}")
+        fi
+        
+        if [[ ${original_size} -gt 0 ]]; then
+            ratio=$(awk "BEGIN {printf \"%.1f\", (1 - ${compressed_size}/${original_size}) * 100}")
+            echo "${ratio}%"
+        else
+            echo "0%"
+        fi
+    else
+        echo "N/A"
+    fi
+}
+
+# Helper function to get raw file size in bytes
+get_raw_file_size() {
+    local file="$1"
+    if [[ -f "${file}" ]]; then
+        # Try wc -c as a last resort
+        if command_exists wc; then
+            wc -c < "${file}" 2>/dev/null || echo "0"
+        else
+            echo "0"
+        fi
+    else
+        echo "0"
+    fi
+}
+
+# =============================================================================
+# CONFIGURATION MANAGEMENT
+# =============================================================================
+
+# Load configuration file
+load_config() {
+    if [[ -f "${config_file}" ]]; then
+        log_debug "Loading configuration from: ${config_file}"
+        # Source config file in a subshell to avoid pollution
+        local old_ifs="${IFS}"
+        while IFS='=' read -r key value; do
+            # Skip comments and empty lines
+            [[ ${key} =~ ^[[:space:]]*# ]] && continue
+            [[ -z ${key} ]] && continue
+            
+            # Remove quotes from value
+            value="${value%\"}"
+            value="${value#\"}"
+            
+            case "${key}" in
+                "default_setting") 
+                    # Only set if not already set by command line
+                    if [[ "${setting}" == "${DEFAULT_SETTING}" ]]; then
+                        setting="${value}"
+                    fi
+                    ;;
+                "default_layout") 
+                    # Only set if not already set by command line
+                    if [[ "${layout}" == "${DEFAULT_LAYOUT}" ]]; then
+                        layout="${value}"
+                    fi
+                    ;;
+                "verbose") 
+                    # Only set if not already set by command line
+                    if [[ "${verbose}" == "false" && "${value}" == "true" ]]; then
+                        verbose=true
+                    fi
+                    ;;
+                "quiet") 
+                    # Only set if not already set by command line
+                    if [[ "${quiet}" == "false" && "${value}" == "true" ]]; then
+                        quiet=true
+                    fi
+                    ;;
+                *) log_warning "Unknown configuration key: ${key}" ;;
+            esac
+        done < "${config_file}"
+        IFS="${old_ifs}"
+    fi
+}
+
+# Create default configuration file
+create_default_config() {
+    ensure_directory "${DEFAULT_CONFIG_DIR}"
+    
+    cat > "${config_file}" << 'EOF'
+# compresspdf configuration file
+# 
+# Default compression setting (default|screen|ebook|printer|prepress)
+default_setting=screen
+
+# Default page layout (letter|a4|legal|prepress)
+default_layout=letter
+
+# Enable verbose output (true|false)
+verbose=false
+
+# Enable quiet mode (true|false)
+quiet=false
+EOF
+    
+    log_info "Created default configuration file: ${config_file}"
+}
+
+# =============================================================================
+# VALIDATION FUNCTIONS
+# =============================================================================
+
+# Validate setting parameter
+validate_setting() {
+    local setting_value="$1"
+    local valid_setting
+    
+    for valid_setting in "${VALID_SETTINGS[@]}"; do
+        if [[ "${setting_value}" == "${valid_setting}" ]]; then
+            return 0
+        fi
+    done
+    
+    log_error "Invalid setting: '${setting_value}'"
+    log_error "Valid settings: ${VALID_SETTINGS[*]}"
+    return 1
+}
+
+# Validate layout parameter
+validate_layout() {
+    local layout_value="$1"
+    local valid_layout
+    
+    for valid_layout in "${VALID_LAYOUTS[@]}"; do
+        if [[ "${layout_value}" == "${valid_layout}" ]]; then
+            return 0
+        fi
+    done
+    
+    log_error "Invalid layout: '${layout_value}'"
+    log_error "Valid layouts: ${VALID_LAYOUTS[*]}"
+    return 1
+}
+
+# Validate page number
+validate_page_number() {
+    local page="$1"
+    local context="$2"
+    
+    if ! [[ "${page}" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid ${context} page number: '${page}' (must be a positive integer)"
+        return 1
+    fi
+    
+    if [[ ${page} -le 0 ]]; then
+        log_error "Invalid ${context} page number: '${page}' (must be greater than 0)"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Validate input file
+validate_input_file() {
+    local file="$1"
+    
+    if [[ ! -f "${file}" ]]; then
+        log_error "Input file does not exist: ${file}"
+        return 1
+    fi
+    
+    if [[ ! -r "${file}" ]]; then
+        log_error "Input file is not readable: ${file}"
+        return 1
+    fi
+    
+    if ! is_pdf_file "${file}"; then
+        log_error "Input file is not a valid PDF: ${file}"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Check dependencies
+check_dependencies() {
+    local missing_deps=()
+    
+    if ! command_exists gs; then
+        missing_deps+=("ghostscript")
+    fi
+    
+    if ! command_exists file; then
+        missing_deps+=("file")
+    fi
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_error "Missing required dependencies: ${missing_deps[*]}"
+        echo ""
+        show_dependency_install_instructions
+        log_fatal "Please install missing dependencies before continuing"
+    fi
+    
+    log_debug "All dependencies satisfied"
+}
+
+# Detect operating system
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if command_exists apt-get; then
+            echo "ubuntu"
+        elif command_exists yum; then
+            echo "rhel"
+        elif command_exists dnf; then
+            echo "fedora"
+        elif command_exists pacman; then
+            echo "arch"
+        elif command_exists apk; then
+            echo "alpine"
+        else
+            echo "linux"
+        fi
+    elif [[ "$OSTYPE" == "freebsd"* ]]; then
+        echo "freebsd"
+    else
+        echo "unknown"
+    fi
+}
+
+# Show OS-specific dependency installation instructions
+show_dependency_install_instructions() {
+    local os
+    os=$(detect_os)
+    
+    echo "${COLOR_BOLD}Installation instructions for missing dependencies:${COLOR_RESET}"
+    echo ""
+    
+    case "${os}" in
+        macos)
+            echo "${COLOR_BOLD}macOS:${COLOR_RESET}"
+            echo "  ${COLOR_GREEN}Using Homebrew (recommended):${COLOR_RESET}"
+            echo "    brew install ghostscript"
+            echo ""
+            echo "  ${COLOR_GREEN}Using MacPorts:${COLOR_RESET}"
+            echo "    sudo port install ghostscript"
+            echo ""
+            echo "  ${COLOR_GREEN}Manual installation:${COLOR_RESET}"
+            echo "    Download from: https://www.ghostscript.com/download/gsdnld.html"
+            ;;
+        ubuntu)
+            echo "${COLOR_BOLD}Ubuntu/Debian:${COLOR_RESET}"
+            echo "  sudo apt-get update"
+            echo "  sudo apt-get install ghostscript file"
+            ;;
+        rhel)
+            echo "${COLOR_BOLD}CentOS/RHEL:${COLOR_RESET}"
+            echo "  sudo yum install ghostscript file"
+            ;;
+        fedora)
+            echo "${COLOR_BOLD}Fedora:${COLOR_RESET}"
+            echo "  sudo dnf install ghostscript file"
+            ;;
+        arch)
+            echo "${COLOR_BOLD}Arch Linux:${COLOR_RESET}"
+            echo "  sudo pacman -S ghostscript file"
+            ;;
+        alpine)
+            echo "${COLOR_BOLD}Alpine Linux:${COLOR_RESET}"
+            echo "  sudo apk add ghostscript file"
+            ;;
+        freebsd)
+            echo "${COLOR_BOLD}FreeBSD:${COLOR_RESET}"
+            echo "  sudo pkg install ghostscript"
+            ;;
+        *)
+            echo "${COLOR_BOLD}Generic Unix/Linux:${COLOR_RESET}"
+            echo "  Install using your system's package manager"
+            echo "  or download from: https://www.ghostscript.com/download/gsdnld.html"
+            ;;
+    esac
+    
+    echo ""
+    echo "${COLOR_BOLD}Verification:${COLOR_RESET}"
+    echo "  After installation, verify with:"
+    echo "    gs --version"
+    echo "    file --version"
+    echo ""
+}
+
+# =============================================================================
+# CORE FUNCTIONALITY
+# =============================================================================
+
+# Build Ghostscript command arguments
+build_gs_command() {
+    local -a gs_args=(
+        "-sDEVICE=pdfwrite"
+        "-dNOPAUSE"
+        "-dBATCH"
+        "-dPDFSETTINGS=/${setting}"
+        "-dFitPage"
+        "-sPAPERSIZE=${layout}"
+        "-dCompatibilityLevel=1.5"
+        "-dSubsetFonts=true"
+        "-dCompressFonts=true"
+        "-dEmbedAllFonts=true"
+        "-dDetectDuplicateImages=true"
+        "-dColorImageDownsampleType=/Bicubic"
+        "-dColorImageResolution=300"
+        "-dGrayImageDownsampleType=/Bicubic"
+        "-dGrayImageResolution=300"
+        "-dMonoImageDownsampleType=/Bicubic"
+        "-dMonoImageResolution=300"
+        "-dDownsampleColorImages=true"
+        "-dDoThumbnails=false"
+        "-dCreateJobTicket=false"
+        "-dPreserveEPSInfo=false"
+        "-dPreserveOPIComments=false"
+        "-dPreserveOverprintSettings=false"
+        "-dUCRandBGInfo=/Remove"
+    )
+    
+    # Add quiet flag if not in verbose mode
+    if [[ ${verbose} == false ]]; then
+        gs_args+=("-dQUIET")
+    fi
+    
+    # Add page range if specified
+    if [[ -n "${initial_page}" && -n "${end_page}" ]]; then
+        gs_args+=("-dFirstPage=${initial_page}")
+        gs_args+=("-dLastPage=${end_page}")
+        log_debug "Adding page range: ${initial_page}-${end_page}"
+    fi
+    
+    # Add grayscale conversion if requested
+    if [[ ${grayscale} == true ]]; then
+        gs_args+=(
+            "-sProcessColorModel=DeviceGray"
+            "-sColorConversionStrategy=Gray"
+            "-dOverrideICC"
+        )
+        log_debug "Enabling grayscale conversion"
+    else
+        gs_args+=(
+            "-sProcessColorModel=DeviceRGB"
+            "-sColorConversionStrategy=RGB"
+            "-sColorConversionStrategyForImages=RGB"
+            "-dConvertCMYKImagesToRGB=true"
+        )
+    fi
+    
+    # Add metadata cleaning if requested
+    if [[ ${clean_metadata} == true ]]; then
+        gs_args+=("-dNO_PDFMARK_OUTLINES")
+        log_debug "Enabling metadata cleaning"
+    fi
+    
+    # Add output and input files
+    gs_args+=("-sOutputFile=${output_file}")
+    gs_args+=("${input_file}")
+    
+    printf '%s\n' "${gs_args[@]}"
+}
+
+# Perform PDF compression
+compress_pdf() {
+    log_info "Starting PDF compression..."
+    log_debug "Input file: ${input_file}"
+    log_debug "Output file: ${output_file}"
+    log_debug "Setting: ${setting}"
+    log_debug "Layout: ${layout}"
+    log_debug "Grayscale: ${grayscale}"
+    log_debug "Clean metadata: ${clean_metadata}"
+    
+    local original_size
+    original_size=$(get_file_size "${input_file}")
+    log_info "Original file size: ${original_size}"
+    
+    if [[ ${dry_run} == true ]]; then
+        log_info "Dry run mode - would execute:"
+        local gs_command_line
+        gs_command_line=$(build_gs_command | tr '\n' ' ')
+        echo "  gs ${gs_command_line}"
+        return 0
+    fi
+    
+    # Check if output file exists and handle overwrite
+    if [[ -f "${output_file}" && ${force_overwrite} == false ]]; then
+        log_error "Output file already exists: ${output_file}"
+        log_error "Use --force to overwrite existing files"
+        return 1
+    fi
+    
+    # Build and execute Ghostscript command
+    log_debug "Building Ghostscript command..."
+    
+    # Execute with progress indication
+    if [[ ${quiet} == false ]]; then
+        echo -n "${COLOR_BLUE}Compressing PDF...${COLOR_RESET}"
+    fi
+    
+    # Use eval to execute the command - compatible with older bash
+    local gs_command_line
+    gs_command_line=$(build_gs_command | tr '\n' ' ')
+    log_debug "Executing: gs ${gs_command_line}"
+    
+    if eval "gs ${gs_command_line}" 2>/dev/null; then
+        if [[ ${quiet} == false ]]; then
+            echo " ${COLOR_GREEN}✓${COLOR_RESET}"
+        fi
+        
+        local compressed_size compression_ratio
+        compressed_size=$(get_file_size "${output_file}")
+        compression_ratio=$(calculate_compression_ratio "${input_file}" "${output_file}")
+        
+        log_info "Compression completed successfully!"
+        log_info "Compressed file size: ${compressed_size}"
+        log_info "Compression ratio: ${compression_ratio}"
+        log_info "Output saved to: ${output_file}"
+        
+        return 0
+    else
+        if [[ ${quiet} == false ]]; then
+            echo " ${COLOR_RED}✗${COLOR_RESET}"
+        fi
+        log_error "PDF compression failed"
+        return 1
+    fi
+}
+
+# =============================================================================
+# HELP AND USAGE
+# =============================================================================
+
+show_version() {
+    echo "${SCRIPT_NAME} ${SCRIPT_VERSION}"
+    echo "${SCRIPT_DESCRIPTION}"
+}
+
+show_help() {
+    cat << EOF
+${COLOR_BOLD}${SCRIPT_NAME}${COLOR_RESET} ${SCRIPT_VERSION} - ${SCRIPT_DESCRIPTION}
+
+${COLOR_BOLD}USAGE:${COLOR_RESET}
+    ${SCRIPT_NAME} [OPTIONS] -f <input-file>
+    ${SCRIPT_NAME} [OPTIONS] <input-file>
+
+${COLOR_BOLD}DESCRIPTION:${COLOR_RESET}
+    Compress PDF files using Ghostscript with various quality settings and options.
+    Supports page range extraction, grayscale conversion, and metadata cleaning.
+
+${COLOR_BOLD}OPTIONS:${COLOR_RESET}
+    ${COLOR_BOLD}-f, --file${COLOR_RESET} <file>        Input PDF file to compress
+    ${COLOR_BOLD}-o, --output${COLOR_RESET} <file>      Output file (default: input_small.pdf)
+    ${COLOR_BOLD}-s, --setting${COLOR_RESET} <setting>  Compression setting (default: ${DEFAULT_SETTING})
+    ${COLOR_BOLD}-l, --layout${COLOR_RESET} <layout>    Page layout (default: ${DEFAULT_LAYOUT})
+    ${COLOR_BOLD}-i, --initial${COLOR_RESET} <page>     Initial page for range extraction
+    ${COLOR_BOLD}-e, --end${COLOR_RESET} <page>         End page for range extraction
+    ${COLOR_BOLD}-g, --grayscale${COLOR_RESET}          Convert to grayscale
+    ${COLOR_BOLD}-c, --clean${COLOR_RESET}              Remove metadata and bookmarks
+    ${COLOR_BOLD}--force${COLOR_RESET}                  Overwrite existing output files
+    ${COLOR_BOLD}--dry-run${COLOR_RESET}                Show command without executing
+    ${COLOR_BOLD}-v, --verbose${COLOR_RESET}            Enable verbose output
+    ${COLOR_BOLD}-q, --quiet${COLOR_RESET}              Suppress non-error output
+    ${COLOR_BOLD}--config${COLOR_RESET} <file>          Use custom configuration file
+    ${COLOR_BOLD}--create-config${COLOR_RESET}          Create default configuration file
+    ${COLOR_BOLD}-h, --help${COLOR_RESET}               Show this help message
+    ${COLOR_BOLD}--version${COLOR_RESET}                Show version information
+    ${COLOR_BOLD}-u, --update${COLOR_RESET}             Update to latest version
+
+${COLOR_BOLD}COMPRESSION SETTINGS:${COLOR_RESET}
+    ${COLOR_BOLD}default${COLOR_RESET}    General purpose, good quality/size balance
+    ${COLOR_BOLD}screen${COLOR_RESET}     Low resolution (72 dpi), smallest file size
+    ${COLOR_BOLD}ebook${COLOR_RESET}      Medium resolution (150 dpi), good for e-readers
+    ${COLOR_BOLD}printer${COLOR_RESET}    High resolution (300 dpi), good for printing
+    ${COLOR_BOLD}prepress${COLOR_RESET}   Highest quality (300 dpi), color preserving
+
+${COLOR_BOLD}PAGE LAYOUTS:${COLOR_RESET}
+    ${COLOR_BOLD}letter${COLOR_RESET}     US Letter (8.5" × 11")
+    ${COLOR_BOLD}a4${COLOR_RESET}         ISO A4 (210 × 297 mm)
+    ${COLOR_BOLD}legal${COLOR_RESET}      US Legal (8.5" × 14")
+
+${COLOR_BOLD}EXAMPLES:${COLOR_RESET}
+    # Basic compression
+    ${SCRIPT_NAME} document.pdf
+
+    # High quality compression with custom output
+    ${SCRIPT_NAME} -s printer -o compressed.pdf document.pdf
+
+    # Extract pages 10-20 in grayscale
+    ${SCRIPT_NAME} -i 10 -e 20 -g document.pdf
+
+    # Clean metadata and use A4 layout
+    ${SCRIPT_NAME} -c -l a4 document.pdf
+
+    # Verbose dry run
+    ${SCRIPT_NAME} --dry-run -v document.pdf
+
+${COLOR_BOLD}CONFIGURATION:${COLOR_RESET}
+    Configuration file: ${DEFAULT_CONFIG_FILE}
+    Log file: ${DEFAULT_LOG_FILE}
+
+    Create a default configuration file with:
+    ${SCRIPT_NAME} --create-config
+
+${COLOR_BOLD}EXIT CODES:${COLOR_RESET}
+    0    Success
+    1    General error
+    2    Invalid arguments
+    3    Missing dependencies
+    4    File not found or not readable
+    5    Compression failed
+
+For more information and examples, visit:
+https://github.com/asiellb/compresspdf
+EOF
+}
+
+# =============================================================================
+# UPDATE FUNCTIONALITY
+# =============================================================================
+
+update_script() {
+    log_info "Checking for updates..."
+    
+    # Create temporary file safely
+    local temp_file
+    if command_exists mktemp; then
+        temp_file=$(mktemp)
+    else
+        # Fallback for systems without mktemp
+        temp_file="/tmp/compresspdf_update_$$"
+        touch "${temp_file}" || {
+            log_error "Cannot create temporary file for update"
+            return 1
+        }
+    fi
+    
+    if ! curl -fsSL "https://git.io/fj98I" -o "${temp_file}"; then
+        log_error "Failed to download update"
+        rm -f "${temp_file}"
+        return 1
+    fi
+    
+    chmod +x "${temp_file}"
+    bash "${temp_file}"
+    local exit_code=$?
+    
+    rm -f "${temp_file}"
+    
+    if [[ ${exit_code} -eq 0 ]]; then
+        log_info "Update completed successfully"
+        exit 0
+    else
+        log_error "Update failed"
+        exit 1
+    fi
+}
+
+# =============================================================================
+# ARGUMENT PARSING
+# =============================================================================
+
+parse_arguments() {
+    # If no arguments provided, show help
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            -u|--update)
+                update_script
+                ;;
+            -f|--file)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                input_file="$2"
+                shift 2
+                ;;
+            -o|--output)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                output_file="$2"
+                shift 2
+                ;;
+            -s|--setting)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                setting="$2"
+                shift 2
+                ;;
+            -l|--layout)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                layout="$2"
+                shift 2
+                ;;
+            -i|--initial)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                initial_page="$2"
+                shift 2
+                ;;
+            -e|--end)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                end_page="$2"
+                shift 2
+                ;;
+            -g|--grayscale)
+                grayscale=true
+                shift
+                ;;
+            -c|--clean)
+                clean_metadata=true
+                shift
+                ;;
+            -v|--verbose)
+                verbose=true
+                shift
+                ;;
+            -q|--quiet)
+                quiet=true
+                shift
+                ;;
+            --force)
+                force_overwrite=true
+                shift
+                ;;
+            --dry-run)
+                dry_run=true
+                shift
+                ;;
+            --config)
+                if [[ $# -lt 2 ]]; then
+                    log_fatal "Option $1 requires an argument"
+                fi
+                config_file="$2"
+                shift 2
+                ;;
+            --create-config)
+                create_default_config
+                exit 0
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                log_fatal "Unknown option: $1"
+                ;;
+            *)
+                # Treat as input file if not already set
+                if [[ -z "${input_file}" ]]; then
+                    input_file="$1"
+                else
+                    log_fatal "Multiple input files specified: ${input_file}, $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Handle remaining positional arguments
+    while [[ $# -gt 0 ]]; do
+        if [[ -z "${input_file}" ]]; then
+            input_file="$1"
+        else
+            log_fatal "Multiple input files specified: ${input_file}, $1"
+        fi
+        shift
+    done
+}
+
+# =============================================================================
+# MAIN FUNCTION
+# =============================================================================
+
+main() {
+    # Initialize
+    init_colors
+    ensure_directory "${DEFAULT_LOG_DIR}"
+    
+    # Load configuration first to set defaults
+    load_config
+    
+    # Parse command line arguments (will override config)
+    parse_arguments "$@"
+    
+    # Validate required arguments
+    if [[ -z "${input_file}" ]]; then
+        log_error "No input file specified"
+        log_error "Use '${SCRIPT_NAME} --help' for usage information"
+        exit 2
+    fi
+    
+    # Set default output file if not specified
+    if [[ -z "${output_file}" ]]; then
+        local base_name="${input_file%.*}"
+        local extension="${input_file##*.}"
+        output_file="${base_name}_small.${extension}"
+    fi
+    
+    # Validate dependencies
+    check_dependencies
+    
+    # Validate arguments
+    validate_setting "${setting}" || exit 2
+    validate_layout "${layout}" || exit 2
+    validate_input_file "${input_file}" || exit 4
+    
+    # Validate page range if specified
+    if [[ -n "${initial_page}" || -n "${end_page}" ]]; then
+        if [[ -z "${initial_page}" || -z "${end_page}" ]]; then
+            log_fatal "Both initial (-i) and end (-e) pages must be specified for page range extraction"
+        fi
+        
+        validate_page_number "${initial_page}" "initial" || exit 2
+        validate_page_number "${end_page}" "end" || exit 2
+        
+        if [[ ${initial_page} -gt ${end_page} ]]; then
+            log_fatal "Initial page (${initial_page}) cannot be greater than end page (${end_page})"
+        fi
+    fi
+    
+    # Validate conflicting options
+    if [[ ${verbose} == true && ${quiet} == true ]]; then
+        log_fatal "Cannot use both --verbose and --quiet options"
+    fi
+    
+    # Perform compression
+    if compress_pdf; then
+        log_debug "Script completed successfully"
+        exit 0
+    else
+        log_error "Script failed"
+        exit 5
+    fi
+}
+
+# =============================================================================
+# SCRIPT ENTRY POINT
+# =============================================================================
+
+# Only run main function if script is executed directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

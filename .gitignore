@@ -1,10 +1,14 @@
+# compresspdf - Professional PDF compression tool
+# .gitignore
+
 # General
 .DS_Store
 .AppleDouble
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -24,3 +28,25 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Project specific
+*.tmp
+*.pdf.bak
+*_small.pdf
+*_compressed.pdf
+
+# Test files (but keep examples)
+/tests/fixtures/*.pdf
+/tests/temp/
+
+# Logs and cache
+*.log
+.cache/
+
+# User configuration (if accidentally copied to project)
+/config
+/.config/
+
+# Build artifacts
+/dist/
+/build/

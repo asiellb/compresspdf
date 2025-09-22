@@ -1,0 +1,14 @@
+# compresspdf configuration example
+# Copy this file to ~/.config/compresspdf/config and modify as needed
+
+# Default compression setting (default|screen|ebook|printer|prepress)
+default_setting=screen
+
+# Default page layout (letter|a4|legal|prepress)
+default_layout=letter
+
+# Enable verbose output by default (true|false)
+verbose=false
+
+# Enable quiet mode by default (true|false)
+quiet=false

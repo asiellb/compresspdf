@@ -1,0 +1,291 @@
+.TH COMPRESSPDF 1 "September 2025" "compresspdf 2.0.0" "User Commands"
+.SH NAME
+compresspdf \- Professional PDF compression tool using Ghostscript
+.SH SYNOPSIS
+.B compresspdf
+[\fIOPTIONS\fR] \fB\-f\fR \fIinput-file\fR
+.br
+.B compresspdf
+[\fIOPTIONS\fR] \fIinput-file\fR
+.SH DESCRIPTION
+.B compresspdf
+is a professional-grade command-line tool for PDF compression, optimization, and manipulation using Ghostscript. It provides multiple quality presets, page range extraction, color management, and metadata control with comprehensive error handling and progress indicators.
+
+The tool supports various compression settings from web-optimized (screen) to professional printing (prepress), allows extraction of specific page ranges, and can convert documents to grayscale or clean metadata for smaller file sizes.
+
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-file " " \fIFILE\fR
+Input PDF file to compress. This option is required unless the input file is provided as a positional argument.
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Output filename. If not specified, defaults to \fIinput\fR_small.pdf where \fIinput\fR is the base name of the input file.
+.TP
+.BR \-s ", " \-\-setting " " \fISETTING\fR
+Compression quality preset. Valid values are:
+.RS
+.IP \fBdefault\fR
+General purpose, good quality/size balance
+.IP \fBscreen\fR
+Low resolution (72 dpi), smallest file size, optimized for screen viewing
+.IP \fBebook\fR
+Medium resolution (150 dpi), good for e-readers and tablets
+.IP \fBprinter\fR
+High resolution (300 dpi), suitable for desktop printing
+.IP \fBprepress\fR
+Highest quality (300 dpi), color preserving, for professional printing
+.RE
+.TP
+.BR \-l ", " \-\-layout " " \fILAYOUT\fR
+Page layout/paper size. Valid values are:
+.RS
+.IP \fBletter\fR
+US Letter (8.5" × 11")
+.IP \fBa4\fR
+ISO A4 (210 × 297 mm)
+.IP \fBlegal\fR
+US Legal (8.5" × 14")
+.RE
+.TP
+.BR \-i ", " \-\-initial " " \fIPAGE\fR
+Initial page number for page range extraction. Must be used together with \fB\-e\fR option. Page numbers start from 1.
+.TP
+.BR \-e ", " \-\-end " " \fIPAGE\fR
+End page number for page range extraction. Must be used together with \fB\-i\fR option. Must be greater than or equal to the initial page.
+.TP
+.BR \-g ", " \-\-grayscale
+Convert the PDF to grayscale. This can significantly reduce file size for documents with color content.
+.TP
+.BR \-c ", " \-\-clean
+Remove metadata, bookmarks, and other non-essential information from the PDF to reduce file size.
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output showing detailed information about the compression process.
+.TP
+.BR \-q ", " \-\-quiet
+Suppress all non-error output. Cannot be used together with \fB\-v\fR.
+.TP
+.B \-\-force
+Overwrite existing output files without prompting.
+.TP
+.B \-\-dry\-run
+Show the Ghostscript command that would be executed without actually running it. Useful for debugging and verification.
+.TP
+.BR \-\-config " " \fIFILE\fR
+Use a custom configuration file instead of the default \fI~/.config/compresspdf/config\fR.
+.TP
+.B \-\-create\-config
+Create a default configuration file and exit.
+.TP
+.BR \-h ", " \-\-help
+Show comprehensive help information and exit.
+.TP
+.B \-\-version
+Display version information and exit.
+.TP
+.BR \-u ", " \-\-update
+Update compresspdf to the latest version and exit.
+
+.SH CONFIGURATION
+.B compresspdf
+supports persistent configuration through a configuration file located at \fI~/.config/compresspdf/config\fR. The configuration file uses a simple key=value format:
+
+.EX
+# Default compression setting
+default_setting=screen
+
+# Default page layout  
+default_layout=letter
+
+# Enable verbose output by default
+verbose=false
+
+# Enable quiet mode by default
+quiet=false
+.EE
+
+Create a default configuration file with:
+.EX
+compresspdf --create-config
+.EE
+
+.SH EXAMPLES
+.TP
+Basic compression with default settings:
+.EX
+compresspdf document.pdf
+.EE
+.TP
+High-quality compression for printing:
+.EX
+compresspdf -s printer document.pdf
+.EE
+.TP
+Compress for web use with custom output:
+.EX
+compresspdf -s screen -o web-optimized.pdf document.pdf
+.EE
+.TP
+Extract pages 10-20 in grayscale:
+.EX
+compresspdf -i 10 -e 20 -g document.pdf
+.EE
+.TP
+Clean metadata and use A4 layout:
+.EX
+compresspdf -c -l a4 document.pdf
+.EE
+.TP
+Verbose dry run to preview the command:
+.EX
+compresspdf --dry-run -v -s printer document.pdf
+.EE
+.TP
+Batch processing multiple files:
+.EX
+for file in *.pdf; do
+    compresspdf -s screen "$file"
+done
+.EE
+
+.SH FILES
+.TP
+.I ~/.config/compresspdf/config
+User configuration file
+.TP
+.I ~/.local/share/compresspdf/logs/compresspdf.log
+Application log file
+.TP
+.I ~/.local/share/bash-completion/completions/compresspdf
+Bash completion script (user installation)
+.TP
+.I ~/.local/share/zsh/site-functions/_compresspdf
+Zsh completion script (user installation)
+.TP
+.I ~/.config/fish/completions/compresspdf.fish
+Fish completion script
+
+.SH ENVIRONMENT
+.TP
+.B COMPRESSPDF_CONFIG
+Override the default configuration file path
+.TP
+.B COMPRESSPDF_LOG_LEVEL
+Set logging verbosity (DEBUG, INFO, WARNING, ERROR)
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Invalid arguments or options
+.TP
+.B 3
+Missing dependencies
+.TP
+.B 4
+Input file not found or not readable
+.TP
+.B 5
+PDF compression failed
+
+.SH DEPENDENCIES
+.B compresspdf
+requires the following programs to be installed:
+.TP
+.B ghostscript (gs)
+PDF processing engine (required)
+.TP
+.B file
+File type detection (required)
+.TP
+.B curl or wget
+For downloading updates (required for \fB\-\-update\fR)
+.TP
+.B du
+File size calculations (optional but recommended)
+.TP
+.B stat
+File information (optional but recommended)
+
+.SH INSTALLATION
+Install dependencies and compresspdf with:
+.EX
+# macOS (Homebrew)
+brew install ghostscript
+
+# Ubuntu/Debian
+sudo apt-get install ghostscript file curl
+
+# Install compresspdf
+curl -L https://git.io/fj98I | bash
+.EE
+
+.SH AUTOCOMPLETION
+.B compresspdf
+provides intelligent autocompletion for bash, zsh, and fish shells. Autocompletion includes:
+.IP \(bu 2
+Option names and aliases
+.IP \(bu 2
+PDF files in the current directory
+.IP \(bu 2
+Valid values for settings and layouts
+.IP \(bu 2
+Context-aware suggestions
+
+Autocompletion is automatically installed with the standard installer. To enable manually, source the appropriate completion script for your shell.
+
+.SH PERFORMANCE
+Typical compression ratios and performance characteristics:
+.TP
+.B screen
+70-90% reduction, fast processing, suitable for web/email
+.TP
+.B ebook
+50-70% reduction, medium processing, good for tablets/e-readers
+.TP
+.B default
+40-60% reduction, medium processing, general purpose
+.TP
+.B printer
+20-40% reduction, slower processing, high quality for printing
+.TP
+.B prepress
+10-30% reduction, slowest processing, professional printing quality
+
+.SH TROUBLESHOOTING
+.TP
+.B "gs: command not found"
+Install Ghostscript using your system's package manager
+.TP
+.B "Permission denied"
+Ensure the script is executable: \fBchmod +x /usr/local/bin/compresspdf\fR
+.TP
+.B "Input file is not a valid PDF"
+Verify the file is a valid PDF: \fBfile document.pdf\fR
+.TP
+.B Large files processing slowly
+Use faster settings (\fBscreen\fR) or extract specific page ranges
+
+Enable verbose mode (\fB\-v\fR) or check log files for detailed error information.
+
+.SH BUGS
+Report bugs at: https://github.com/asiellb/compresspdf/issues
+
+.SH AUTHOR
+Enhanced version developed as a professional upgrade to the original compresspdf script.
+
+.SH COPYRIGHT
+This is free software; see the source code for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+.SH SEE ALSO
+.BR gs (1),
+.BR file (1),
+.BR pdf2ps (1),
+.BR ps2pdf (1)
+
+Full documentation and examples: https://github.com/asiellb/compresspdf
