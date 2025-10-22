@@ -597,12 +597,19 @@ compress_pdf() {
         echo -n "${COLOR_BLUE}Compressing PDF...${COLOR_RESET}"
     fi
     
-    # Use eval to execute the command - compatible with older bash
-    local gs_command_line
-    gs_command_line=$(build_gs_command | tr '\n' ' ')
-    log_debug "Executing: gs ${gs_command_line}"
+    # Execute the command directly with proper argument handling
+    # Using array to preserve proper quoting for files with spaces
+    log_debug "Building Ghostscript command array"
     
-    if eval "gs ${gs_command_line}" 2>/dev/null; then
+    local -a gs_cmd
+    while IFS= read -r arg; do
+        gs_cmd+=("${arg}")
+    done < <(build_gs_command)
+    
+    log_debug "Executing: gs with ${#gs_cmd[@]} arguments"
+    log_debug "Output file: ${output_file}"
+    
+    if gs "${gs_cmd[@]}" 2>/dev/null; then
         if [[ ${quiet} == false ]]; then
             echo " ${COLOR_GREEN}✓${COLOR_RESET}"
         fi

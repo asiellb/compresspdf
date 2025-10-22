@@ -57,13 +57,13 @@ _compresspdf_completion() {
     # Handle specific option arguments
     case "${prev}" in
         -f|--file)
-            # Complete with PDF files
-            COMPREPLY=($(compgen -W "$(_compresspdf_pdf_files "${cur}")" -- "${cur}"))
+            # Complete with PDF files - use compgen directly for file completion
+            COMPREPLY=($(compgen -f -X '!*.pdf' -- "${cur}"))
             return 0
             ;;
         -o|--output)
-            # Complete with all files
-            COMPREPLY=($(compgen -W "$(_compresspdf_all_files "${cur}")" -- "${cur}"))
+            # Complete with all files - use compgen directly for file completion
+            COMPREPLY=($(compgen -f -- "${cur}"))
             return 0
             ;;
         -s|--setting)
@@ -81,8 +81,8 @@ _compresspdf_completion() {
             return 0
             ;;
         --config)
-            # Complete with config files
-            COMPREPLY=($(compgen -W "$(_compresspdf_all_files "${cur}")" -- "${cur}"))
+            # Complete with config files - use compgen directly for file completion
+            COMPREPLY=($(compgen -f -- "${cur}"))
             return 0
             ;;
     esac
@@ -96,14 +96,11 @@ _compresspdf_completion() {
             ;;
         *)
             # Complete with PDF files by default
-            local pdf_files
-            pdf_files=$(_compresspdf_pdf_files "${cur}")
+            COMPREPLY=($(compgen -f -X '!*.pdf' -- "${cur}"))
             
             # If no PDF files found, also suggest options
-            if [[ -z "${pdf_files}" ]]; then
+            if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
                 COMPREPLY=($(compgen -W "${all_opts}" -- "${cur}"))
-            else
-                COMPREPLY=($(compgen -W "${pdf_files}" -- "${cur}"))
             fi
             return 0
             ;;
