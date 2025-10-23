@@ -19,8 +19,7 @@ readonly SCRIPT_REPO="https://github.com/asiellb/compresspdf"
 readonly SCRIPT_URL="https://raw.githubusercontent.com/asiellb/compresspdf/master/src/compresspdf"
 readonly COMPLETION_URL="https://raw.githubusercontent.com/asiellb/compresspdf/master/scripts/compresspdf-completion.bash"
 readonly FISH_COMPLETION_URL="https://raw.githubusercontent.com/asiellb/compresspdf/master/scripts/compresspdf-completion.fish"
-readonly QUICK_ACTION_QUICK_URL="https://raw.githubusercontent.com/asiellb/compresspdf/master/macos-quick-actions/compress-pdf-quick.sh"
-readonly QUICK_ACTION_CUSTOM_URL="https://raw.githubusercontent.com/asiellb/compresspdf/master/macos-quick-actions/compress-pdf-custom.sh"
+readonly GITHUB_REPO_ARCHIVE="https://github.com/asiellb/compresspdf/archive/refs/heads/master.tar.gz"
 
 # Installation paths (will be configured by configure_install_paths)
 INSTALL_DIR="/usr/local/bin"
@@ -696,19 +695,71 @@ install_macos_quick_actions() {
         return 1
     fi
     
+    # Create temporary directory for download
+    local temp_dir
+    temp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t 'compresspdf')
+    
+    if [[ ! -d "${temp_dir}" ]]; then
+        log_error "Could not create temporary directory"
+        return 1
+    fi
+    
+    # Download and extract repository archive
+    log_info "Downloading Quick Actions from GitHub..."
+    if ! curl -fsSL "${GITHUB_REPO_ARCHIVE}" | tar -xz -C "${temp_dir}" 2>/dev/null; then
+        log_error "Failed to download and extract repository"
+        rm -rf "${temp_dir}"
+        return 1
+    fi
+    
+    # Find the extracted directory (should be compresspdf-master)
+    local extracted_dir
+    extracted_dir=$(find "${temp_dir}" -maxdepth 1 -type d -name "compresspdf-*" | head -n1)
+    
+    if [[ ! -d "${extracted_dir}" ]]; then
+        log_error "Could not find extracted repository"
+        rm -rf "${temp_dir}"
+        return 1
+    fi
+    
+    local workflows_dir="${extracted_dir}/macos-quick-actions"
     local installed_any=false
     
-    # Install Quick Action (Quick version)
-    if install_quick_action_quick; then
-        installed_any=true
+    # Copy Quick Action workflows
+    if [[ -d "${workflows_dir}/Compress PDF (Quick).workflow" ]]; then
+        log_info "Installing Compress PDF (Quick)..."
+        if cp -R "${workflows_dir}/Compress PDF (Quick).workflow" "${MACOS_SERVICES_DIR}/"; then
+            chmod -R 755 "${MACOS_SERVICES_DIR}/Compress PDF (Quick).workflow"
+            installed_any=true
+            log_info "✓ Compress PDF (Quick) installed"
+        else
+            log_warning "Could not install Compress PDF (Quick)"
+        fi
     fi
     
-    # Install Quick Action (Custom version)
-    if install_quick_action_custom; then
-        installed_any=true
+    if [[ -d "${workflows_dir}/Compress PDF (Custom).workflow" ]]; then
+        log_info "Installing Compress PDF (Custom)..."
+        if cp -R "${workflows_dir}/Compress PDF (Custom).workflow" "${MACOS_SERVICES_DIR}/"; then
+            chmod -R 755 "${MACOS_SERVICES_DIR}/Compress PDF (Custom).workflow"
+            installed_any=true
+            log_info "✓ Compress PDF (Custom) installed"
+        else
+            log_warning "Could not install Compress PDF (Custom)"
+        fi
     fi
+    
+    # Clean up
+    rm -rf "${temp_dir}"
     
     if [[ ${installed_any} == true ]]; then
+        # Refresh Services database
+        log_info "Refreshing Services database..."
+        if command_exists /System/Library/CoreServices/pbs; then
+            /System/Library/CoreServices/pbs -flush 2>/dev/null || true
+            /System/Library/CoreServices/pbs -update 2>/dev/null || true
+        fi
+        killall -HUP Finder 2>/dev/null || true
+        
         log_info "macOS Quick Actions installed successfully"
         log_info "You can now right-click PDF files in Finder → Quick Actions"
         echo
@@ -716,337 +767,13 @@ install_macos_quick_actions() {
         echo "  ${COLOR_GREEN}•${COLOR_RESET} Compress PDF (Quick) - Compresión rápida con configuración predeterminada"
         echo "  ${COLOR_GREEN}•${COLOR_RESET} Compress PDF (Custom) - Compresión interactiva con opciones"
         echo
+        echo "${COLOR_YELLOW}Nota:${COLOR_RESET} Si no aparecen inmediatamente, cierra sesión y vuelve a iniciarla"
+        echo
         return 0
     else
         log_warning "Could not install any Quick Actions"
         return 1
     fi
-}
-
-install_quick_action_quick() {
-    local workflow_name="Compress PDF (Quick).workflow"
-    local workflow_path="${MACOS_SERVICES_DIR}/${workflow_name}"
-    
-    # Download Quick Action script
-    if ! download_file "${QUICK_ACTION_QUICK_URL}" "${TEMP_QUICK_ACTION_QUICK}" "Quick Action (Quick) script"; then
-        return 1
-    fi
-    
-    # Create Automator workflow
-    if create_automator_workflow "${TEMP_QUICK_ACTION_QUICK}" "${workflow_path}" "Compress PDF (Quick)"; then
-        log_info "Quick Action (Quick) installed to: ${workflow_path}"
-        return 0
-    else
-        log_warning "Could not install Quick Action (Quick)"
-        return 1
-    fi
-}
-
-install_quick_action_custom() {
-    local workflow_name="Compress PDF (Custom).workflow"
-    local workflow_path="${MACOS_SERVICES_DIR}/${workflow_name}"
-    
-    # Download Quick Action script
-    if ! download_file "${QUICK_ACTION_CUSTOM_URL}" "${TEMP_QUICK_ACTION_CUSTOM}" "Quick Action (Custom) script"; then
-        return 1
-    fi
-    
-    # Create Automator workflow
-    if create_automator_workflow "${TEMP_QUICK_ACTION_CUSTOM}" "${workflow_path}" "Compress PDF (Custom)"; then
-        log_info "Quick Action (Custom) installed to: ${workflow_path}"
-        return 0
-    else
-        log_warning "Could not install Quick Action (Custom)"
-        return 1
-    fi
-}
-
-create_automator_workflow() {
-    local script_file="$1"
-    local workflow_path="$2"
-    local workflow_name="$3"
-    
-    # Read script content
-    local script_content
-    if [[ ! -f "${script_file}" ]]; then
-        return 1
-    fi
-    script_content=$(cat "${script_file}")
-    
-    # Create workflow directory
-    mkdir -p "${workflow_path}/Contents"
-    
-    # Create document.wflow file
-    cat > "${workflow_path}/Contents/document.wflow" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>AMApplicationBuild</key>
-	<string>523</string>
-	<key>AMApplicationVersion</key>
-	<string>2.10</string>
-	<key>AMDocumentVersion</key>
-	<string>2</string>
-	<key>actions</key>
-	<array>
-		<dict>
-			<key>action</key>
-			<dict>
-				<key>AMAccepts</key>
-				<dict>
-					<key>Container</key>
-					<string>List</string>
-					<key>Optional</key>
-					<true/>
-					<key>Types</key>
-					<array>
-						<string>com.apple.cocoa.string</string>
-					</array>
-				</dict>
-				<key>AMActionVersion</key>
-				<string>2.0.3</string>
-				<key>AMApplication</key>
-				<array>
-					<string>Automator</string>
-				</array>
-				<key>AMParameterProperties</key>
-				<dict>
-					<key>COMMAND_STRING</key>
-					<dict/>
-					<key>CheckedForUserDefaultShell</key>
-					<dict/>
-					<key>inputMethod</key>
-					<dict/>
-					<key>shell</key>
-					<dict/>
-					<key>source</key>
-					<dict/>
-				</dict>
-				<key>AMProvides</key>
-				<dict>
-					<key>Container</key>
-					<string>List</string>
-					<key>Types</key>
-					<array>
-						<string>com.apple.cocoa.string</string>
-					</array>
-				</dict>
-				<key>ActionBundlePath</key>
-				<string>/System/Library/Automator/Run Shell Script.action</string>
-				<key>ActionName</key>
-				<string>Run Shell Script</string>
-				<key>ActionParameters</key>
-				<dict>
-					<key>COMMAND_STRING</key>
-					<string>${script_content}</string>
-					<key>CheckedForUserDefaultShell</key>
-					<true/>
-					<key>inputMethod</key>
-					<integer>1</integer>
-					<key>shell</key>
-					<string>/bin/bash</string>
-					<key>source</key>
-					<string></string>
-				</dict>
-				<key>BundleIdentifier</key>
-				<string>com.apple.RunShellScript</string>
-				<key>CFBundleVersion</key>
-				<string>2.0.3</string>
-				<key>CanShowSelectedItemsWhenRun</key>
-				<false/>
-				<key>CanShowWhenRun</key>
-				<true/>
-				<key>Category</key>
-				<array>
-					<string>AMCategoryUtilities</string>
-				</array>
-				<key>Class Name</key>
-				<string>RunShellScriptAction</string>
-				<key>InputUUID</key>
-				<string>$(uuidgen)</string>
-				<key>Keywords</key>
-				<array>
-					<string>Shell</string>
-					<string>Script</string>
-					<string>Command</string>
-					<string>Run</string>
-					<string>Unix</string>
-				</array>
-				<key>OutputUUID</key>
-				<string>$(uuidgen)</string>
-				<key>UUID</key>
-				<string>$(uuidgen)</string>
-				<key>UnlocalizedApplications</key>
-				<array>
-					<string>Automator</string>
-				</array>
-				<key>arguments</key>
-				<dict>
-					<key>0</key>
-					<dict>
-						<key>default value</key>
-						<integer>0</integer>
-						<key>name</key>
-						<string>inputMethod</string>
-						<key>required</key>
-						<string>0</string>
-						<key>type</key>
-						<string>0</string>
-						<key>uuid</key>
-						<string>0</string>
-					</dict>
-					<key>1</key>
-					<dict>
-						<key>default value</key>
-						<false/>
-						<key>name</key>
-						<string>CheckedForUserDefaultShell</string>
-						<key>required</key>
-						<string>0</string>
-						<key>type</key>
-						<string>0</string>
-						<key>uuid</key>
-						<string>1</string>
-					</dict>
-					<key>2</key>
-					<dict>
-						<key>default value</key>
-						<string></string>
-						<key>name</key>
-						<string>source</string>
-						<key>required</key>
-						<string>0</string>
-						<key>type</key>
-						<string>0</string>
-						<key>uuid</key>
-						<string>2</string>
-					</dict>
-					<key>3</key>
-					<dict>
-						<key>default value</key>
-						<string></string>
-						<key>name</key>
-						<string>COMMAND_STRING</string>
-						<key>required</key>
-						<string>0</string>
-						<key>type</key>
-						<string>0</string>
-						<key>uuid</key>
-						<string>3</string>
-					</dict>
-					<key>4</key>
-					<dict>
-						<key>default value</key>
-						<string>/bin/sh</string>
-						<key>name</key>
-						<string>shell</string>
-						<key>required</key>
-						<string>0</string>
-						<key>type</key>
-						<string>0</string>
-						<key>uuid</key>
-						<string>4</string>
-					</dict>
-				</dict>
-				<key>isViewVisible</key>
-				<integer>1</integer>
-			</dict>
-		</dict>
-	</array>
-	<key>connectors</key>
-	<dict/>
-	<key>workflowMetaData</key>
-	<dict>
-		<key>workflowTypeIdentifier</key>
-		<string>com.apple.Automator.servicesMenu</string>
-		<key>servicesApplications</key>
-		<array>
-			<string>Finder</string>
-		</array>
-		<key>serviceInputTypeIdentifier</key>
-		<string>com.apple.Automator.fileSystemObject</string>
-		<key>serviceOutputTypeIdentifier</key>
-		<string>com.apple.Automator.nothing</string>
-		<key>serviceProcessesInput</key>
-		<integer>0</integer>
-	</dict>
-</dict>
-</plist>
-EOF
-    
-    # Create Info.plist
-    cat > "${workflow_path}/Contents/Info.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>English</string>
-	<key>CFBundleExecutable</key>
-	<string>Application Stub</string>
-	<key>CFBundleIconFile</key>
-	<string>ApplicationStub.icns</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.apple.Automator.${workflow_name// /_}</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>${workflow_name}</string>
-	<key>CFBundlePackageType</key>
-	<string>BNDL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleURLTypes</key>
-	<array/>
-	<key>CFBundleVersion</key>
-	<string>523</string>
-	<key>DTCompiler</key>
-	<string>com.apple.compilers.llvm.clang.1_0</string>
-	<key>DTPlatformBuild</key>
-	<string>12C33</string>
-	<key>DTPlatformVersion</key>
-	<string>GM</string>
-	<key>DTSDKBuild</key>
-	<string>20C63</string>
-	<key>DTSDKName</key>
-	<string>macosx11.1</string>
-	<key>DTXcode</key>
-	<string>1230</string>
-	<key>DTXcodeBuild</key>
-	<string>12C33</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2025. All rights reserved.</string>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
-	<key>NSServices</key>
-	<array>
-		<dict>
-			<key>NSMenuItem</key>
-			<dict>
-				<key>default</key>
-				<string>${workflow_name}</string>
-			</dict>
-			<key>NSMessage</key>
-			<string>runWorkflowAsService</string>
-			<key>NSRequiredContext</key>
-			<dict>
-				<key>NSApplicationIdentifier</key>
-				<string>com.apple.finder</string>
-			</dict>
-			<key>NSSendFileTypes</key>
-			<array>
-				<string>public.item</string>
-			</array>
-		</dict>
-	</array>
-</dict>
-</plist>
-EOF
-    
-    return 0
 }
 
 # =============================================================================
