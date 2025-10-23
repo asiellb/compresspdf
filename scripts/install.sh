@@ -1212,18 +1212,21 @@ uninstall() {
 perform_installation() {
     log_info "Starting ${SCRIPT_NAME} installation..."
     
-    # Check if already installed and up to date
-    if command_exists "${SCRIPT_NAME}"; then
+    # Check if already installed and up to date (unless force flag is set)
+    if [[ ${force} == false ]] && command_exists "${SCRIPT_NAME}"; then
         local current_version
         if current_version=$("${SCRIPT_NAME}" --version 2>/dev/null | head -n1 | awk '{print $2}'); then
             if [[ "${current_version}" == "${SCRIPT_VERSION}" ]]; then
                 log_info "${SCRIPT_NAME} ${current_version} is already installed and up to date"
+                log_info "Use --force to reinstall"
                 return 0
             else
                 log_info "Found ${SCRIPT_NAME} ${current_version}, updating to ${SCRIPT_VERSION}..."
                 return update_installation
             fi
         fi
+    elif [[ ${force} == true ]]; then
+        log_info "Force flag detected, reinstalling..."
     fi
     
     # Perform fresh installation
@@ -1277,7 +1280,7 @@ ${COLOR_BOLD}COMMANDS:${COLOR_RESET}
 
 ${COLOR_BOLD}OPTIONS:${COLOR_RESET}
     ${COLOR_BOLD}--no-completion${COLOR_RESET}  Skip installation of completion scripts
-    ${COLOR_BOLD}--force${COLOR_RESET}         Force installation even if already installed
+    ${COLOR_BOLD}-f, --force${COLOR_RESET}      Force installation/reinstall even if already installed
     ${COLOR_BOLD}--quiet${COLOR_RESET}         Suppress informational output
 
 ${COLOR_BOLD}EXAMPLES:${COLOR_RESET}
@@ -1343,7 +1346,7 @@ main() {
             --no-completion)
                 skip_completion=true
                 ;;
-            --force)
+            -f|--force)
                 force=true
                 ;;
             --quiet)
