@@ -36,15 +36,13 @@
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
-			<key>NSRequiredContext</key>
-			<dict>
-				<key>NSApplicationIdentifier</key>
-				<string>com.apple.finder</string>
-			</dict>
-			<key>NSSendFileTypes</key>
+			<key>NSSendTypes</key>
 			<array>
-				<string>com.adobe.pdf</string>
-				<string>public.pdf</string>
+				<string>NSFilenamesPboardType</string>
+			</array>
+			<key>NSReturnTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
 			</array>
 		</dict>
 	</array>
