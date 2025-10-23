@@ -5,7 +5,10 @@ Professional PDF compression tool using Ghostscript
 ## Quick Start
 
 ```bash
-# Install
+# Install (one-line installation)
+curl -fsSL https://raw.githubusercontent.com/asiellb/compresspdf/master/scripts/install.sh | bash -s install
+
+# Or using make
 make install
 
 # Basic usage
@@ -13,6 +16,9 @@ compresspdf document.pdf
 
 # Advanced usage
 compresspdf -s printer -l a4 -g document.pdf
+
+# macOS: Use Quick Actions in Finder (installed automatically)
+# Right-click any PDF → Quick Actions → Compress PDF
 ```
 
 ## Project Structure
@@ -55,7 +61,8 @@ See [docs/README.md](docs/README.md) for complete documentation.
 - **Professional compression** with 5 quality levels
 - **Multiple page formats** (Letter, A4, Legal)
 - **Advanced options** (grayscale, metadata cleaning, page ranges)
-- **Intelligent autocompletion** for all supported shells
+- **macOS Quick Actions** for Finder integration (right-click on PDFs)
+- **Intelligent autocompletion** for Bash, Zsh, and Fish shells
 - **Robust error handling** and logging
 - **Cross-platform compatibility** (macOS, Linux, Unix)
 - **Configurable defaults** via config file
