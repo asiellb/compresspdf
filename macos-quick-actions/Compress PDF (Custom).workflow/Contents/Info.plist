@@ -5,6 +5,10 @@
 	<key>NSServices</key>
 	<array>
 		<dict>
+			<key>NSBackgroundColorName</key>
+			<string>background</string>
+			<key>NSIconName</key>
+			<string>NSActionTemplate</string>
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
@@ -12,13 +16,14 @@
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
-			<key>NSSendTypes</key>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+			<key>NSSendFileTypes</key>
 			<array>
-				<string>NSFilenamesPboardType</string>
-			</array>
-			<key>NSReturnTypes</key>
-			<array>
-				<string>NSFilenamesPboardType</string>
+				<string>public.item</string>
 			</array>
 		</dict>
 	</array>

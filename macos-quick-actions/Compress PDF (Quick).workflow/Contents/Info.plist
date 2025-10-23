@@ -2,33 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>English</string>
-	<key>CFBundleExecutable</key>
-	<string>Application Stub</string>
-	<key>CFBundleIconFile</key>
-	<string>ApplicationStub.icns</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.apple.Automator.Compress_PDF_Quick</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>Compress PDF (Quick)</string>
-	<key>CFBundlePackageType</key>
-	<string>BNDL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>1.0</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2025. All rights reserved.</string>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
 	<key>NSServices</key>
 	<array>
 		<dict>
+			<key>NSBackgroundColorName</key>
+			<string>background</string>
+			<key>NSIconName</key>
+			<string>NSActionTemplate</string>
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
@@ -36,13 +16,14 @@
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
-			<key>NSSendTypes</key>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+			<key>NSSendFileTypes</key>
 			<array>
-				<string>NSFilenamesPboardType</string>
-			</array>
-			<key>NSReturnTypes</key>
-			<array>
-				<string>NSFilenamesPboardType</string>
+				<string>public.item</string>
 			</array>
 		</dict>
 	</array>

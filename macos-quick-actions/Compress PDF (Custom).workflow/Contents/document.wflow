@@ -64,6 +64,9 @@
 # Quick Action: Compress PDF (Custom settings)
 # Allows choosing quality, layout, and options
 
+# Set PATH to include common installation locations
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # Check if compresspdf is installed
 if ! command -v compresspdf &amp;&gt; /dev/null; then
     osascript -e 'display dialog "compresspdf no está instalado.\n\nInstálalo con:\ncurl -fsSL https://raw.githubusercontent.com/asiellb/compresspdf/master/scripts/install.sh | bash" buttons {"OK"} default button "OK" with icon stop'
@@ -94,12 +97,12 @@ if [ "$options" = "false" ]; then
     exit 0
 fi
 
-# Build command flags
-flags="-q ${quality_flag}"
+# Build command arguments array
+cmd_args=(-q "${quality_flag}")
 case "$options" in
-    "Limpiar metadata"*) flags="${flags} -c" ;;
-    "Formato Letter"*) flags="${flags} -l letter" ;;
-    "Ambas opciones"*) flags="${flags} -c -l letter" ;;
+    "Limpiar metadata"*) cmd_args+=(-c) ;;
+    "Formato Letter"*) cmd_args+=(-l letter) ;;
+    "Ambas opciones"*) cmd_args+=(-c -l letter) ;;
 esac
 
 # Process each selected file
@@ -114,8 +117,8 @@ for file in "$@"; do
         # Show notification
         osascript -e "display notification \"Comprimiendo: ${filename}.pdf\" with title \"Compress PDF\" subtitle \"${quality_flag}\""
         
-        # Run compresspdf with custom settings
-        if compresspdf -f "${file}" -o "${output}" ${flags} 2&gt;&amp;1 | grep -q "successfully"; then
+        # Run compresspdf with custom settings (options must go before -f)
+        if compresspdf "${cmd_args[@]}" -f "${file}" -o "${output}" 2&gt;&amp;1 &amp;&amp; [ -f "${output}" ]; then
             # Get file sizes for notification
             original_size=$(du -h "${file}" | cut -f1)
             compressed_size=$(du -h "${output}" | cut -f1)
@@ -127,7 +130,8 @@ for file in "$@"; do
     else
         osascript -e 'display notification "El archivo no es un PDF" with title "Compress PDF" sound name "Basso"'
     fi
-done</string>
+done
+</string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
 					<key>inputMethod</key>
@@ -152,7 +156,7 @@ done</string>
 				<key>Class Name</key>
 				<string>RunShellScriptAction</string>
 				<key>InputUUID</key>
-				<string>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</string>
+				<string>6074F558-7464-4705-8398-557D49C97D6E</string>
 				<key>Keywords</key>
 				<array>
 					<string>Shell</string>
@@ -162,9 +166,9 @@ done</string>
 					<string>Unix</string>
 				</array>
 				<key>OutputUUID</key>
-				<string>B2C3D4E5-F678-90AB-CDEF-123456789012</string>
+				<string>A376205C-715C-404F-BBD8-6484EF9331F8</string>
 				<key>UUID</key>
-				<string>C3D4E5F6-7890-ABCD-EF12-3456789ABCDE</string>
+				<string>59C57D2B-115B-4927-8538-9CBBB9E5AE2D</string>
 				<key>UnlocalizedApplications</key>
 				<array>
 					<string>Automator</string>

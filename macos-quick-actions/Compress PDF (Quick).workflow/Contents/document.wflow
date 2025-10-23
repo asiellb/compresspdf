@@ -65,6 +65,9 @@
 # Compresses PDFs with clean metadata and letter size
 # No dialogs, fast compression
 
+# Set PATH to include common installation locations
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # Check if compresspdf is installed
 if ! command -v compresspdf &amp;&gt; /dev/null; then
     osascript -e 'display dialog "compresspdf no está instalado.\n\nInstálalo con:\ncurl -fsSL https://raw.githubusercontent.com/asiellb/compresspdf/master/scripts/install.sh | bash" buttons {"OK"} default button "OK" with icon stop'
@@ -84,7 +87,7 @@ for file in "$@"; do
         osascript -e "display notification \"Comprimiendo: ${filename}.pdf\" with title \"Compress PDF\" subtitle \"Clean + Letter\""
         
         # Run compresspdf with default settings (screen quality, clean metadata, letter)
-        if compresspdf -f "${file}" -o "${output}" -c -l letter 2&gt;&amp;1 | grep -q "successfully"; then
+        if compresspdf -f "${file}" -o "${output}" -c -l letter 2&gt;&amp;1 &amp;&amp; [ -f "${output}" ]; then
             # Get file sizes for notification
             original_size=$(du -h "${file}" | cut -f1)
             compressed_size=$(du -h "${output}" | cut -f1)
@@ -94,9 +97,10 @@ for file in "$@"; do
             osascript -e "display notification \"✗ Error al comprimir\" with title \"Compress PDF\" subtitle \"${filename}.pdf\" sound name \"Basso\""
         fi
     else
-        osascript -e 'display notification "El archivo no es un PDF" with title "Compress PDF" sound name "Basso"'
+        osascript -e 'display notification "El archivo no es un PDF" with title \"Compress PDF\" sound name \"Basso\"'
     fi
-done</string>
+done
+</string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
 					<key>inputMethod</key>
@@ -121,7 +125,7 @@ done</string>
 				<key>Class Name</key>
 				<string>RunShellScriptAction</string>
 				<key>InputUUID</key>
-				<string>DAC5674E-12B2-4A03-8C5F-80FA41B0EC2B</string>
+				<string>15DB96A3-5C31-45A7-BB08-53A4278221A0</string>
 				<key>Keywords</key>
 				<array>
 					<string>Shell</string>
@@ -131,9 +135,9 @@ done</string>
 					<string>Unix</string>
 				</array>
 				<key>OutputUUID</key>
-				<string>9B78DD8C-9245-46B3-AAE4-5BF7A674575A</string>
+				<string>84065A8C-5DAB-4A74-8288-BD185A7D6160</string>
 				<key>UUID</key>
-				<string>CD2E7AA0-F184-46CF-B408-49491E73F887</string>
+				<string>C9441AE4-A35C-4E3A-AA0E-E0F13D987881</string>
 				<key>UnlocalizedApplications</key>
 				<array>
 					<string>Automator</string>
